@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cz.mtrakal.vmptesty.data.Zpusobilost
@@ -97,7 +98,11 @@ private fun SetRow(
     onToggle: () -> Unit,
 ) {
     ClickableRow(onClick = onToggle) {
-        Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        Checkbox(
+            checked = checked,
+            onCheckedChange = { onToggle() },
+            modifier = Modifier.scale(Dimens.checkboxScale),
+        )
         Column(Modifier.padding(start = 4.dp)) {
             Text(
                 text = "${set.code} — ${set.label}",

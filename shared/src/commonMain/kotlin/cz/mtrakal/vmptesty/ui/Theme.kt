@@ -6,7 +6,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 
 /**
  * Material 3 nemá barvu pro "správně" — `error` má jen svůj protipól v podobě
@@ -36,6 +39,39 @@ private val DarkColors = darkColorScheme(
     primaryContainer = Color(0xFF004B70),
     onPrimaryContainer = Color(0xFFCBE6FF),
 )
+
+/**
+ * True na úzkých displejích (telefon). Nastavuje se v [cz.mtrakal.vmptesty.App]
+ * podle šířky okna.
+ */
+val LocalCompactWidth = staticCompositionLocalOf { false }
+
+/** Hranice, pod kterou se layout považuje za telefonní. */
+val COMPACT_WIDTH_THRESHOLD = 600.dp
+
+/**
+ * Velikosti prvků, které se na telefonu zvětšují.
+ *
+ * Na dotykovém displeji drženém v ruce jsou desktopové velikosti odznaků
+ * a teček zbytečně drobné, na myš naopak sedí.
+ */
+object Dimens {
+
+    /** Kolečko s písmenem odpovědi. */
+    val answerBadge: Dp
+        @Composable @ReadOnlyComposable
+        get() = if (LocalCompactWidth.current) 36.dp else 28.dp
+
+    /** Barevná tečka v počítadle správně/špatně. */
+    val scoreDot: Dp
+        @Composable @ReadOnlyComposable
+        get() = if (LocalCompactWidth.current) 14.dp else 10.dp
+
+    /** Checkbox nemá parametr velikosti, zvětšuje se proto škálováním. */
+    val checkboxScale: Float
+        @Composable @ReadOnlyComposable
+        get() = if (LocalCompactWidth.current) 1.25f else 1f
+}
 
 /** Námořně modré téma, jinak Material 3 defaulty. */
 @Composable

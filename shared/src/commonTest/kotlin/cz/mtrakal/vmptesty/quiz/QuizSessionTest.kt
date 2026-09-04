@@ -48,6 +48,21 @@ class QuizSessionTest {
     }
 
     @Test
+    fun `delka odpovida zkousce ma 35 otazek`() {
+        val session = QuizSession.build(pool, allSets, QuizLength.EXAM, seeded())
+
+        assertEquals(35, QuizLength.EXAM.count)
+        assertEquals(35, session.items.size)
+    }
+
+    @Test
+    fun `nabizene delky jsou serazene vzestupne a Vse je posledni`() {
+        val counts = QuizLength.entries.map { it.count }
+
+        assertEquals(listOf(20, 35, 50, null), counts)
+    }
+
+    @Test
     fun `kdyz je otazek malo pouzije vsechny dostupne`() {
         val session = QuizSession.build(pool, setOf(Zpusobilost.C), QuizLength.MEDIUM, seeded())
 

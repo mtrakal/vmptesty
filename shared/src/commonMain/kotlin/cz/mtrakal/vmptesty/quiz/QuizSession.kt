@@ -5,9 +5,14 @@ import cz.mtrakal.vmptesty.data.Question
 import cz.mtrakal.vmptesty.data.Zpusobilost
 import kotlin.random.Random
 
-/** Kolik otázek má vygenerovaná sada mít. */
+/**
+ * Kolik otázek má vygenerovaná sada mít. Pořadí konstant určuje pořadí v UI.
+ *
+ * [EXAM] je 35 otázek, což odpovídá rozsahu ostrého testu.
+ */
 enum class QuizLength(val count: Int?, val label: String) {
     SHORT(20, "20"),
+    EXAM(35, "35"),
     MEDIUM(50, "50"),
     ALL(null, "Vše"),
 }

@@ -141,7 +141,7 @@ private fun ScoreChip(count: Int, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(10.dp)
+                .size(Dimens.scoreDot)
                 .background(color = color, shape = CircleShape)
         )
         Text(
@@ -213,7 +213,7 @@ private fun AnswerBadge(label: String, state: AnswerState) {
     Surface(
         shape = CircleShape,
         color = color,
-        modifier = Modifier.size(28.dp),
+        modifier = Modifier.size(Dimens.answerBadge),
     ) {
         Box(contentAlignment = Alignment.Center) {
             // Vždy písmeno odpovědi - správnost už nese barva odznaku i rámeček.

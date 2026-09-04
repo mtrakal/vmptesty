@@ -1,0 +1,55 @@
+name: Deploy web na GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Pages potřebuje právo zapisovat artefakt a razit OIDC token pro deploy.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Souběžné deploye nedávají smysl; rozdělaný běh ale nerušíme, ať se
+# nasazení nezastaví v půlce.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nastavit JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Nastavit Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Testy
+        run: ./gradlew :shared:jvmTest
+
+      - name: Build webu
+        run: ./gradlew :webApp:wasmJsBrowserDistribution
+
+      - name: Nahrát artefakt pro Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: webApp/build/dist/wasmJs/productionExecutable
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Nasadit na Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
