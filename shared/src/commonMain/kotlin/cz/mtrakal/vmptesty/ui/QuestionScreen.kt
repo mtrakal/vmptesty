@@ -2,6 +2,8 @@ package cz.mtrakal.vmptesty.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,13 +72,18 @@ fun QuestionScreen(
 
             item.question.image?.let { QuestionImage(name = it) }
 
-            item.answers.forEachIndexed { index, answer ->
-                AnswerCard(
-                    label = ANSWER_LABELS.getOrElse(index) { "?" },
-                    answer = answer,
-                    state = answerState(session, item, index),
-                    onClick = { onSelect(index) },
-                )
+            // Klíč na index otázky: bez něj by animateColorAsState dofadeovávalo
+            // zvýraznění z předchozí otázky přes novou, takže by chvíli svítila
+            // "správná" odpověď, na kterou se nikdo neptal.
+            key(session.index) {
+                item.answers.forEachIndexed { index, answer ->
+                    AnswerCard(
+                        label = ANSWER_LABELS.getOrElse(index) { "?" },
+                        answer = answer,
+                        state = answerState(session, item, index),
+                        onClick = { onSelect(index) },
+                    )
+                }
             }
 
             Spacer(Modifier.height(8.dp))
@@ -109,8 +117,8 @@ private fun QuizHeader(session: QuizSession) {
                     style = MaterialTheme.typography.labelLarge,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ScoreChip("✓ ${session.score.correct}", correctColor())
-                    ScoreChip("✗ ${session.score.wrong}", MaterialTheme.colorScheme.error)
+                    ScoreChip(session.score.correct, correctColor())
+                    ScoreChip(session.score.wrong, MaterialTheme.colorScheme.error)
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -122,14 +130,28 @@ private fun QuizHeader(session: QuizSession) {
     }
 }
 
+/**
+ * Počítadlo jako barevná tečka a číslo.
+ *
+ * Záměrně bez glyfů ✓/✗ — výchozí font Skii na webu je nemá a vykreslily by
+ * se jako prázdné rámečky. Tečka je nakreslený tvar, ten se vykreslí vždy.
+ */
 @Composable
-private fun ScoreChip(text: String, color: Color) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold,
-        color = color,
-    )
+private fun ScoreChip(count: Int, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(color = color, shape = CircleShape)
+        )
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            modifier = Modifier.padding(start = 6.dp),
+        )
+    }
 }
 
 @Composable
@@ -154,12 +176,13 @@ private fun AnswerCard(
     }
 
     Card(
-        onClick = onClick,
-        // Po odpovědi jsou odpovědi zamčené, další kliknutí už skóre nemění.
-        enabled = state == AnswerState.Idle,
         colors = CardDefaults.cardColors(containerColor = container),
         border = border?.let { BorderStroke(2.dp, it) },
-        modifier = Modifier.fillMaxWidth(),
+        // Zámek řeší clickable, ne Card(enabled = false) - ten by ztmavil obsah
+        // disabled alphou právě ve chvíli, kdy si chceš správnou odpověď přečíst.
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = state == AnswerState.Idle, onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -193,12 +216,9 @@ private fun AnswerBadge(label: String, state: AnswerState) {
         modifier = Modifier.size(28.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
+            // Vždy písmeno odpovědi - správnost už nese barva odznaku i rámeček.
             Text(
-                text = when (state) {
-                    AnswerState.Correct -> "✓"
-                    AnswerState.Wrong -> "✗"
-                    else -> label
-                },
+                text = label,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.surface,

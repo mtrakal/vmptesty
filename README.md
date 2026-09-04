@@ -1,41 +1,98 @@
-This is a Kotlin Multiplatform project targeting Android, Web, Desktop (JVM).
+# VMP Testy
 
-* [/shared](./shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+Procvičování testových otázek ke zkoušce **Vůdce malého plavidla** — způsobilosti
+**M** (motorové plavidlo), **S** (plachetnice) a **C** (námořní plavba).
 
-### Running the apps
+Kotlin Multiplatform + Compose Multiplatform, běží na Androidu, desktopu (JVM)
+a na webu (Kotlin/Wasm). Otázky jsou bundlované, aplikace funguje offline.
 
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
+## Jak to funguje
 
-- Android app: `./gradlew :androidApp:assembleDebug`
-- Desktop app:
-  - Hot reload: `./gradlew :desktopApp:hotRun --auto`
-  - Standard run: `./gradlew :desktopApp:run`
-- Web app:
-  - Wasm target (faster, modern browsers): `./gradlew :webApp:wasmJsBrowserDevelopmentRun`
-  - JS target (slower, supports older browsers): `./gradlew :webApp:jsBrowserDevelopmentRun`
+1. Vybereš, které sady se chceš učit (lze víc než jednu) a kolik otázek — 20, 50, nebo vše.
+2. Aplikace vygeneruje zamíchanou sadu a pouští ji po jedné otázce.
+3. Po zaškrtnutí odpovědi se hned ukáže, jestli byla správně. U chybné odpovědi
+   se zároveň zvýrazní ta správná.
+4. V hlavičce průběžně běží počítadlo `✓ správně · ✗ špatně`, na konci je souhrn
+   s úspěšností a rozpadem podle sad.
 
-### Running tests
+Skóre platí jen pro aktuální běh aplikace — nic se neukládá.
 
-Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
+## Data
 
-- Android tests: `./gradlew :shared:testAndroidHostTest`
-- Desktop tests: `./gradlew :shared:jvmTest`
-- Web tests:
-  - Wasm target: `./gradlew :shared:wasmJsTest`
-  - JS target: `./gradlew :shared:jsTest`
+792 otázek (S 170, C 215, M 407), každá se třemi odpověďmi, a 242 obrázků.
+Zdrojem je [Státní plavební správa](http://www.spspraha.cz/zkousky/).
 
----
+Data jsou bundlovaná jako resource:
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
-[Compose Multiplatform](https://kotlinlang.org/compose-multiplatform/),
-[Kotlin/Wasm](https://kotl.in/wasm/)…
+```
+shared/src/commonMain/composeResources/files/questions.tsv
+shared/src/commonMain/composeResources/files/images/*.jpg
+```
 
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them on [YouTrack](https://youtrack.jetbrains.com/newIssue?project=CMP).
+Dvě vlastnosti zdroje, které stojí za zmínku:
+
+- **Správná odpověď je na webu SPS vždy `a)`**, takže aplikace odpovědi míchá —
+  jinak by se dala správná odpověď uhádnout podle pozice.
+- Obrázek může být u otázky i u jednotlivých odpovědí, a některé odpovědi jsou
+  **jen obrázkové, úplně bez textu**.
+
+### Regenerace dat
+
+Když Státní plavební správa otázky změní:
+
+```bash
+python tools/scrape.py
+```
+
+Skript stáhne HTML, přepíše TSV a doplní chybějící obrázky. Padne, pokud
+nenajde očekávané počty otázek — tichá změna zdroje se tak neprojeví až
+za běhu. Po regeneraci spusť testy, `QuestionDataTest` ověří integritu dat.
+
+## Spuštění
+
+```bash
+./gradlew :desktopApp:run
+```
+
+```bash
+./gradlew :androidApp:assembleDebug
+```
+
+```bash
+./gradlew :webApp:wasmJsBrowserDevelopmentRun
+```
+
+Web dev server běží na <http://localhost:8080>. Produkční build webu:
+`./gradlew :webApp:wasmJsBrowserDistribution` (výstup v `webApp/build/dist`).
+
+## Testy
+
+```bash
+./gradlew :shared:jvmTest
+```
+
+- `QuestionParserTest` — parser TSV včetně všech variant obrázků a chybových stavů
+- `QuizSessionTest` — filtrace sad, míchání, skóre, přechody mezi otázkami
+- `QuestionDataTest` — integrita reálných dat (počty, existence všech obrázků)
+- `ResourceLoadingTest` — že se bundlované resources za běhu skutečně načtou
+
+## Struktura
+
+| Cesta | Co tam je |
+|---|---|
+| `shared/…/data` | model otázky, parser TSV, načtení resource |
+| `shared/…/quiz` | `QuizSession` (čistá logika bez Compose) a `QuizViewModel` |
+| `shared/…/ui` | obrazovky Setup / Question / Result, theme, načítání obrázků |
+| `androidApp`, `desktopApp`, `webApp` | jen vstupní body, které volají `App()` |
+| `tools/scrape.py` | regenerátor dat ze stránek SPS |
+| `docs/superpowers/specs/` | návrhový dokument |
+
+`QuizSession` a `QuestionParser` záměrně nezávisí na Compose, takže je pokrývají
+běžné unit testy.
+
+## Poznámka k buildu
+
+`gradle.properties` nastavuje `kotlin.user.home=.kotlin-home`, aby Kotlin držel
+npm tooling v projektu. Bez toho ho instaluje do `~/.kotlin`, kde si yarn 1.x
+najde v domovském adresáři cizí `package.json` s polem `packageManager`
+a odmítne pokračovat — wasm build pak spadne na `kotlinWasmToolingSetup`.
