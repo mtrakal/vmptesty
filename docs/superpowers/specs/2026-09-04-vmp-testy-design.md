@@ -28,7 +28,13 @@ Zjištěné vlastnosti HTML:
 
 - Každá otázka má přesně **3 odpovědi**.
 - Správná odpověď je **vždy `a)`** → v aplikaci se odpovědi **musí míchat**.
-- Obrázek je nejvýše jeden a je vždy v řádku otázky, nikdy u odpovědi.
+- Obrázek může být **u otázky i u jednotlivých odpovědí**. U otázky nejvýše
+  jeden (224 otázek: C 62, M 162). V sadě C je navíc **16 otázek, kde má
+  obrázek každá ze tří odpovědí** (obrázkové varianty, např. vrcholové znaky
+  bójí). U 7 z těchto 16 otázek jsou odpovědi **jen obrázkové, úplně bez
+  textu** (21 takových odpovědí) — karta odpovědi tedy musí zvládnout tři
+  varianty: jen text, text + obrázek, jen obrázek. Celkem 272 odkazů na 242
+  unikátních souborů (některé obrázky se opakují u více otázek).
 - Každá otázka nese zkratku podsady (S: `P1 2015`–`P4 2015`; C: `M1`, `MP1`–`MP4`,
   `N1`–`N4`, `Z1`; M: `PP1 2015`–`PP4 2015`, `TZ 2015`, `ZP 2015`).
 - Pole `Poznámka` je ve zdroji zakomentované → ignoruje se.
@@ -45,15 +51,20 @@ shared/src/commonMain/composeResources/files/questions.tsv
 shared/src/commonMain/composeResources/files/images/*.jpg
 ```
 
-Sloupce TSV (tab-separated, jeden řádek = jedna otázka):
+Sloupce TSV (tab-separated, jeden řádek = jedna otázka, 11 sloupců):
 
 ```
-id  zpusobilost  podsada  obrazek  otazka  spravna  odpovedB  odpovedC
+id  zpusobilost  podsada  qImage  qText  aText  aImage  bText  bImage  cText  cImage
 ```
 
 - `zpusobilost` ∈ `S` | `C` | `M`
-- `obrazek` je název souboru (např. `221.jpg`) nebo prázdný string
+- `*Image` je název souboru (např. `221.jpg`) nebo prázdný string
+- `aText`/`aImage` je vždy **správná** odpověď (míchá se až v aplikaci)
 - v textech se nevyskytují taby ani nové řádky (parser je normalizuje na mezery)
+- `*Text` odpovědi smí být prázdný, pokud má odpověď obrázek; text otázky
+  prázdný být nesmí
+- ve zdrojových buňkách se nevyskytují žádné inline tagy kromě `<img>` ani HTML
+  entity, takže čištění textu je triviální
 
 **Regenerátor `tools/scrape.py`** se commituje do repozitáře, aby šlo data
 znovu vytáhnout, když SPS otázky změní. Stahuje HTML, parsuje regexem,
@@ -72,7 +83,7 @@ Veškerá logika i UI v `shared/src/commonMain`, aplikační moduly
 
 | Soubor | Odpovědnost |
 |---|---|
-| `data/Question.kt` | model: `id`, `zpusobilost`, `podsada`, `image: String?`, `text`, `answers: List<String>`, `correctIndex` |
+| `data/Question.kt` | modely: `Answer(text, image: String?)` a `Question(id, zpusobilost, podsada, text, image: String?, answers: List<Answer>, correctIndex)`. Identita otázky je pár `(zpusobilost, id)` — čísla se mezi sadami opakují. |
 | `data/QuestionParser.kt` | čistá funkce `parseTsv(String): List<Question>` |
 | `data/QuestionRepository.kt` | načtení TSV z composeResources → `List<Question>` |
 | `quiz/QuizSession.kt` | čistá logika: filtrace poolu, zamíchání otázek i odpovědí, posun, skóre |
@@ -106,7 +117,9 @@ Loading ──► Setup ──(Start)──► Running ──(poslední otázka)
 
 - Hlavička: `otázka 5/20` a počítadlo `✓ 3 · ✗ 1`.
 - Text otázky, pod ním obrázek (pokud otázka obrázek má).
-- Tři odpovědi jako klikatelné karty **v zamíchaném pořadí**.
+- Tři odpovědi jako klikatelné karty **v zamíchaném pořadí**; karta zobrazí
+  text a pod ním obrázek, pokud ho odpověď má. U obrázkových odpovědí bez
+  textu se zobrazí jen obrázek (karta nesmí zkolabovat na nulovou výšku).
 - Pořadí otázek i odpovědí se zamíchá jednou při stavbě běhu (nemění se při
   rekompozici).
 
@@ -131,12 +144,19 @@ Počítá se jen za běh aplikace, **nic se nepersistuje**. Restart appky = nula
 
 1. `parseTsv` vrátí 792 otázek, z toho 170 `S`, 215 `C`, 407 `M`.
 2. Každá otázka má přesně 3 neprázdné odpovědi a `correctIndex` v rozsahu 0..2.
-3. Filtrace poolu podle vybraných způsobilostí vrací správné počty.
+   Odpověď má neprázdný text NEBO obrázek. Existuje aspoň jedna otázka
+   s obrázkem u otázky, aspoň jedna s obrázky u odpovědí a aspoň jedna
+   s odpovědí bez textu (regrese proti tomu, že by scraper obrázky
+   odpovědí zahodil).
+3. Filtrace poolu podle vybraných způsobilostí vrací správné počty; pár
+   `(zpusobilost, id)` je unikátní (samotné `id` není — mezi sadami se opakuje).
 4. Zamíchání se seedovaným `Random` je deterministické a zachová všechny otázky.
 5. Zamíchání odpovědí zachová `correctIndex` ukazující na původní správný text.
 6. Skóre: správná odpověď zvýší `correct`, chybná `wrong`, druhé kliknutí na
    stejnou otázku skóre nemění.
-7. Počet unikátních obrázků v TSV odpovídá počtu souborů v resources.
+7. Počet unikátních názvů obrázků v TSV je 242 a každý název končí `.jpg`
+   (existenci souborů ověřuje `tools/scrape.py` při generování, `commonTest`
+   neumí přenositelně listovat resource adresář).
 
 ## Co záměrně není součástí
 
