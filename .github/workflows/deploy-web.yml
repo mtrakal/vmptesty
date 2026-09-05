@@ -32,8 +32,15 @@ jobs:
       - name: Nastavit Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # enablement zapne Pages se zdrojem "GitHub Actions" samo,
+      # aby se to nemuselo proklikavat v nastaveni repozitare.
+      - name: Zapnout Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Testy
-        run: ./gradlew :shared:jvmTest
+        run: ./gradlew :shared:jvmTest :wearApp:testDebugUnitTest
 
       - name: Build webu
         run: ./gradlew :webApp:wasmJsBrowserDistribution
