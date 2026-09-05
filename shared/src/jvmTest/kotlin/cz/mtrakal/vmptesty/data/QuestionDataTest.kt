@@ -9,13 +9,13 @@ import kotlin.test.assertTrue
  * Integrita reálných bundlovaných dat.
  *
  * Běží jen na JVM, protože potřebuje filesystem — díky tomu umí ověřit i to,
- * že každý obrázek odkazovaný z TSV skutečně existuje jako soubor. Tenhle test
+ * že každý obrázek odkazovaný z dat skutečně existuje jako soubor. Tenhle test
  * je záchytná síť proti tomu, aby regenerace přes `tools/scrape.py` tiše
  * rozbila data.
  */
 class QuestionDataTest {
 
-    private val questions: List<Question> = QuestionParser.parse(tsvFile().readText())
+    private val questions: List<Question> = QuestionParser.parse(dataFile().readText())
 
     @Test
     fun `obsahuje vsech 792 otazek se spravnymi pocty na sadu`() {
@@ -89,7 +89,7 @@ class QuestionDataTest {
             error("nenalezen adresář $relative")
         }
 
-        fun tsvFile(): File = File(resourcesDir(), "questions.tsv")
+        fun dataFile(): File = File(resourcesDir(), "questions.json")
 
         fun imagesDir(): File = File(resourcesDir(), "images")
     }

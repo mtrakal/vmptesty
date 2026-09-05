@@ -20,17 +20,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.decodeToImageBitmap
-import vmptesty.shared.generated.resources.Res
 
 /**
- * Obrázek k otázce nebo odpovědi.
+ * Obrázek k otázce nebo odpovědi na telefonu, desktopu a webu.
  *
- * Obrázky se nenačítají jako typované `Res.drawable.*` — názvy souborů jako
- * `221.jpg` nebo `261BA.jpg` nejsou platné Kotlin identifikátory. Načítají se
- * proto dynamicky z `files/images` podle názvu z dat. Na webu se díky tomu
- * stahují lazy až u dané otázky.
+ * Načítání řeší [QuestionImages]; na webu se díky tomu obrázky stahují lazy
+ * až u dané otázky. Hodinky mají vlastní, menší variantu.
  *
  * @param name název souboru, např. `221.jpg`
  */
@@ -40,7 +35,7 @@ fun QuestionImage(
     modifier: Modifier = Modifier,
     maxHeight: Int = 260,
 ) {
-    val bitmap = rememberImageBitmap(name)
+    val bitmap = rememberQuestionImage(name)
 
     Box(
         modifier = modifier
@@ -62,27 +57,15 @@ fun QuestionImage(
     }
 }
 
+/** Načte obrázek mimo kompozici; do prvního snímku vrátí to, co už je v cache. */
 @Composable
-private fun rememberImageBitmap(name: String): ImageBitmap? {
-    var bitmap by remember(name) { mutableStateOf(imageCache[name]) }
+fun rememberQuestionImage(name: String): ImageBitmap? {
+    var bitmap by remember(name) { mutableStateOf(QuestionImages.cached(name)) }
 
     LaunchedEffect(name) {
-        if (bitmap == null) {
-            bitmap = loadImage(name)?.also { imageCache[name] = it }
-        }
+        if (bitmap == null) bitmap = QuestionImages.load(name)
     }
     return bitmap
 }
-
-@OptIn(ExperimentalResourceApi::class)
-private suspend fun loadImage(name: String): ImageBitmap? = runCatching {
-    Res.readBytes("files/images/$name").decodeToImageBitmap()
-}.getOrNull()
-
-/**
- * Dekódované obrázky se drží v paměti — sada obrázků je malá (5 MB zdrojových
- * JPEG) a při procvičování se stejné obrázky opakují.
- */
-private val imageCache = mutableMapOf<String, ImageBitmap>()
 
 private const val PLACEHOLDER_HEIGHT = 120

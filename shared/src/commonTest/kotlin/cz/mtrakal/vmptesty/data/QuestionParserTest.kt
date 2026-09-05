@@ -10,7 +10,7 @@ class QuestionParserTest {
 
     @Test
     fun `parsuje otazku bez obrazku`() {
-        val question = QuestionParser.parse(row(TEXT_ONLY)).single()
+        val question = QuestionParser.parse(document(TEXT_ONLY)).single()
 
         assertEquals(412, question.id)
         assertEquals(Zpusobilost.S, question.zpusobilost)
@@ -24,7 +24,7 @@ class QuestionParserTest {
 
     @Test
     fun `parsuje obrazek u otazky`() {
-        val question = QuestionParser.parse(row(QUESTION_IMAGE)).single()
+        val question = QuestionParser.parse(document(QUESTION_IMAGE)).single()
 
         assertEquals("221.jpg", question.image)
         assertTrue(question.answers.all { it.image == null })
@@ -32,7 +32,7 @@ class QuestionParserTest {
 
     @Test
     fun `parsuje obrazky u odpovedi`() {
-        val question = QuestionParser.parse(row(ANSWER_IMAGES)).single()
+        val question = QuestionParser.parse(document(ANSWER_IMAGES)).single()
 
         assertNull(question.image)
         assertEquals(listOf("N03a.jpg", "N07.jpg", "N08.jpg"), question.answers.map { it.image })
@@ -41,92 +41,177 @@ class QuestionParserTest {
 
     @Test
     fun `parsuje odpovedi jen s obrazkem bez textu`() {
-        val question = QuestionParser.parse(row(IMAGE_ONLY_ANSWERS)).single()
+        val question = QuestionParser.parse(document(IMAGE_ONLY_ANSWERS)).single()
 
         assertEquals(listOf("N16.jpg", "N17.jpg", "N18.jpg"), question.answers.map { it.image })
         assertTrue(question.answers.none { it.hasText })
     }
 
     @Test
-    fun `preskoci prazdne radky`() {
-        val tsv = row(TEXT_ONLY) + "\n\n" + row(QUESTION_IMAGE) + "\n"
+    fun `spravnou odpoved urcuje priznak, ne poradi`() {
+        // Stejná otázka, ale správná odpověď je až třetí v souboru.
+        val question = QuestionParser.parse(document(CORRECT_LAST)).single()
 
-        assertEquals(2, QuestionParser.parse(tsv).size)
+        assertEquals(2, question.correctIndex)
+        assertEquals("správná až na konci.", question.correctAnswer.text)
     }
 
     @Test
-    fun `spadne na spatnem poctu sloupcu`() {
-        val error = assertFailsWith<IllegalArgumentException> {
-            QuestionParser.parse("412\tS\tP1 2015")
-        }
+    fun `parsuje vic otazek`() {
+        val questions = QuestionParser.parse(document(TEXT_ONLY, QUESTION_IMAGE))
 
-        assertTrue("3 sloupců" in error.message.orEmpty(), error.message.orEmpty())
+        assertEquals(listOf(412, 221), questions.map { it.id })
+    }
+
+    @Test
+    fun `ignoruje neznama pole`() {
+        val json = """
+            {"version":1,"neznamy":"klic","questions":[$TEXT_ONLY]}
+        """.trimIndent()
+
+        assertEquals(1, QuestionParser.parse(json).size)
+    }
+
+    @Test
+    fun `spadne na nepodporovane verzi schematu`() {
+        val json = """{"version":99,"questions":[$TEXT_ONLY]}"""
+
+        val error = assertFailsWith<IllegalArgumentException> { QuestionParser.parse(json) }
+
+        assertTrue("verzi 99" in error.message.orEmpty(), error.message.orEmpty())
     }
 
     @Test
     fun `spadne na nezname zpusobilosti`() {
         assertFailsWith<IllegalArgumentException> {
-            QuestionParser.parse(row(TEXT_ONLY).replace("\tS\t", "\tX\t"))
-        }
-    }
-
-    @Test
-    fun `spadne na necislenem id`() {
-        assertFailsWith<IllegalArgumentException> {
-            QuestionParser.parse(row(TEXT_ONLY).replaceFirst("412", "ctyristadvanact"))
+            QuestionParser.parse(document(TEXT_ONLY.replace("\"set\": \"S\"", "\"set\": \"X\"")))
         }
     }
 
     @Test
     fun `spadne na prazdnem textu otazky`() {
         assertFailsWith<IllegalArgumentException> {
-            QuestionParser.parse(row(TEXT_ONLY).replace("Výraz plachetnice označuje:", ""))
+            QuestionParser.parse(
+                document(TEXT_ONLY.replace("\"Výraz plachetnice označuje:\"", "\"\"")),
+            )
         }
     }
 
     @Test
-    fun `spadne na odpovedi bez textu i obrazku`() {
-        val columns = TEXT_ONLY.toMutableList()
-        columns[7] = ""
-
+    fun `spadne kdyz zadna odpoved neni spravna`() {
         val error = assertFailsWith<IllegalArgumentException> {
-            QuestionParser.parse(row(columns))
+            QuestionParser.parse(document(TEXT_ONLY.replace("\"correct\": true", "\"correct\": false")))
         }
 
-        assertTrue("odpověď b" in error.message.orEmpty(), error.message.orEmpty())
+        assertTrue("nalezeno 0" in error.message.orEmpty(), error.message.orEmpty())
     }
 
-    private fun row(columns: List<String>) = columns.joinToString("\t")
+    @Test
+    fun `spadne kdyz je spravnych odpovedi vic`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            QuestionParser.parse(document(TWO_CORRECT))
+        }
+
+        assertTrue("nalezeno 2" in error.message.orEmpty(), error.message.orEmpty())
+    }
+
+    @Test
+    fun `spadne na odpovedi bez textu i obrazku`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            QuestionParser.parse(document(EMPTY_ANSWER))
+        }
+
+        assertTrue("bez textu i obrázku" in error.message.orEmpty(), error.message.orEmpty())
+    }
+
+    private fun document(vararg questions: String) =
+        """{"version":1,"source":"test","questions":[${questions.joinToString(",")}]}"""
 
     private companion object {
-        //          id     zp   podsada     qImg   qText  aText  aImg  bText  bImg  cText  cImg
-        val TEXT_ONLY = listOf(
-            "412", "S", "P1 2015", "",
-            "Výraz plachetnice označuje:",
-            "loď pro plavbu pomocí plachet.", "",
-            "jakékoli plavidlo hnané větrem.", "",
-            "plavidlo využívající plochy lodního tělesa.", "",
-        )
-        val QUESTION_IMAGE = listOf(
-            "221", "M", "PP2 2015", "221.jpg",
-            "Tato signalizační světla nese:",
-            "plavidlo s vlečnou soupravou.", "",
-            "plavidlo stojící na mělčině.", "",
-            "plavidlo provádějící práce.", "",
-        )
-        val ANSWER_IMAGES = listOf(
-            "127", "C", "N3", "",
-            "Červené válcové bóje mohou mít jako vrcholový znak:",
-            "červený válec.", "N03a.jpg",
-            "červenou kouli.", "N07.jpg",
-            "červený kužel.", "N08.jpg",
-        )
-        val IMAGE_ONLY_ANSWERS = listOf(
-            "134", "C", "N4", "",
-            "Bóje má jako vrcholový znak:",
-            "", "N16.jpg",
-            "", "N17.jpg",
-            "", "N18.jpg",
-        )
+
+        val TEXT_ONLY = """
+            {
+              "id": 412, "set": "S", "subset": "P1 2015",
+              "text": "Výraz plachetnice označuje:",
+              "answers": [
+                {"text": "loď pro plavbu pomocí plachet.", "correct": true},
+                {"text": "jakékoli plavidlo hnané větrem."},
+                {"text": "plavidlo využívající plochy lodního tělesa."}
+              ]
+            }
+        """.trimIndent()
+
+        val QUESTION_IMAGE = """
+            {
+              "id": 221, "set": "M", "subset": "PP2 2015",
+              "text": "Tato signalizační světla nese:",
+              "image": "221.jpg",
+              "answers": [
+                {"text": "plavidlo s vlečnou soupravou.", "correct": true},
+                {"text": "plavidlo stojící na mělčině."},
+                {"text": "plavidlo provádějící práce."}
+              ]
+            }
+        """.trimIndent()
+
+        val ANSWER_IMAGES = """
+            {
+              "id": 127, "set": "C", "subset": "N3",
+              "text": "Červené válcové bóje mohou mít jako vrcholový znak:",
+              "answers": [
+                {"text": "červený válec.", "image": "N03a.jpg", "correct": true},
+                {"text": "červenou kouli.", "image": "N07.jpg"},
+                {"text": "červený kužel.", "image": "N08.jpg"}
+              ]
+            }
+        """.trimIndent()
+
+        val IMAGE_ONLY_ANSWERS = """
+            {
+              "id": 134, "set": "C", "subset": "N4",
+              "text": "Bóje má jako vrcholový znak:",
+              "answers": [
+                {"text": "", "image": "N16.jpg", "correct": true},
+                {"text": "", "image": "N17.jpg"},
+                {"text": "", "image": "N18.jpg"}
+              ]
+            }
+        """.trimIndent()
+
+        val CORRECT_LAST = """
+            {
+              "id": 1, "set": "M", "subset": "PP1 2015",
+              "text": "Otázka:",
+              "answers": [
+                {"text": "první."},
+                {"text": "druhá."},
+                {"text": "správná až na konci.", "correct": true}
+              ]
+            }
+        """.trimIndent()
+
+        val TWO_CORRECT = """
+            {
+              "id": 2, "set": "M", "subset": "PP1 2015",
+              "text": "Otázka:",
+              "answers": [
+                {"text": "první.", "correct": true},
+                {"text": "druhá.", "correct": true},
+                {"text": "třetí."}
+              ]
+            }
+        """.trimIndent()
+
+        val EMPTY_ANSWER = """
+            {
+              "id": 3, "set": "M", "subset": "PP1 2015",
+              "text": "Otázka:",
+              "answers": [
+                {"text": "první.", "correct": true},
+                {"text": ""},
+                {"text": "třetí."}
+              ]
+            }
+        """.trimIndent()
     }
 }

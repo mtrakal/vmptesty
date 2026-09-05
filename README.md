@@ -25,7 +25,7 @@ Zdrojem je [Státní plavební správa](http://www.spspraha.cz/zkousky/).
 Data jsou bundlovaná jako resource:
 
 ```
-shared/src/commonMain/composeResources/files/questions.tsv
+shared/src/commonMain/composeResources/files/questions.json
 shared/src/commonMain/composeResources/files/images/*.jpg
 ```
 
@@ -44,7 +44,7 @@ Když Státní plavební správa otázky změní:
 python tools/scrape.py
 ```
 
-Skript stáhne HTML, přepíše TSV a doplní chybějící obrázky. Padne, pokud
+Skript stáhne HTML, přepíše JSON a doplní chybějící obrázky. Padne, pokud
 nenajde očekávané počty otázek — tichá změna zdroje se tak neprojeví až
 za běhu. Po regeneraci spusť testy, `QuestionDataTest` ověří integritu dat.
 
@@ -71,7 +71,7 @@ Web dev server běží na <http://localhost:8080>. Produkční build webu:
 ./gradlew :shared:jvmTest
 ```
 
-- `QuestionParserTest` — parser TSV včetně všech variant obrázků a chybových stavů
+- `QuestionParserTest` — parser JSON včetně všech variant obrázků a chybových stavů
 - `QuizSessionTest` — filtrace sad, míchání, skóre, přechody mezi otázkami
 - `QuestionDataTest` — integrita reálných dat (počty, existence všech obrázků)
 - `ResourceLoadingTest` — že se bundlované resources za běhu skutečně načtou
@@ -80,7 +80,7 @@ Web dev server běží na <http://localhost:8080>. Produkční build webu:
 
 | Cesta | Co tam je |
 |---|---|
-| `shared/…/data` | model otázky, parser TSV, načtení resource |
+| `shared/…/data` | model otázky, parser JSON, načtení resource |
 | `shared/…/quiz` | `QuizSession` (čistá logika bez Compose) a `QuizViewModel` |
 | `shared/…/ui` | obrazovky Setup / Question / Result, theme, načítání obrázků |
 | `androidApp`, `desktopApp`, `webApp` | jen vstupní body, které volají `App()` |
