@@ -35,18 +35,13 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
-    signingConfigs {
-        create("release") {
-            storeFile =
-            storePassword = "android"
-            keyAlias = "android"
-            keyPassword = "android"
-        }
-    }
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            // Podepisuje se vychozim ladicim klicem (~/.android/debug.keystore),
+            // aby slo release APK rovnou nainstalovat. Na Google Play by to
+            // nestacilo, tam je potreba vlastni klic mimo repozitar.
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
