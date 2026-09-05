@@ -50,6 +50,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // Podepisuje se vychozim ladicim klicem (~/.android/debug.keystore),
+            // aby slo release APK rovnou nainstalovat na hodinky bez rucniho
+            // apksigneru. Na Google Play by to nestacilo, tam je potreba
+            // vlastni klic - ten sem ale nepatri, do repozitare se necommituje.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
