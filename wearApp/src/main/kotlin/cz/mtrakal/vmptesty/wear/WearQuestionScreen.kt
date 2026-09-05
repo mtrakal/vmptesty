@@ -2,6 +2,7 @@ package cz.mtrakal.vmptesty.wear
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,8 +16,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberOverscrollEffect
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,12 +49,16 @@ private val ANSWER_LABELS = listOf("a", "b", "c")
 /**
  * Otázka na hodinkách. Cílem je rychlý dril, takže se chová jinak než telefon:
  *
- * - správná odpověď posune rovnou na další otázku, bez potvrzování
+ * - správná odpověď na okamžik zezelená ([WearUiState.Phase.CorrectFlash])
+ *   a pak sama přeskočí na další otázku, bez potvrzování
  * - chybná odpověď na okamžik zčervená ([WearUiState.Phase.WrongFlash]) a pak
  *   na obrazovce zůstane jen ta správná ([WearUiState.Phase.Correction])
  *   s tlačítkem dál
  *
- * Díky tomu je jedno klepnutí za otázku, když ji umíš, a dvě, když ne.
+ * Díky tomu je jedno klepnutí za otázku, když ji umíš, a dvě, když ne. V opravné
+ * fázi posune dál klepnutí kamkoliv, ne jen na tlačítko — [EdgeButton] u spodní
+ * hrany se u delších otázek dostane pod viditelnou plochu a museli bys k němu
+ * scrollovat.
  */
 @Composable
 fun WearQuestionScreen(
@@ -93,7 +100,20 @@ fun WearQuestionScreen(
         TransformingLazyColumn(
             state = listState,
             contentPadding = contentPadding,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (phase == WearUiState.Phase.Correction) {
+                        // Bez indikace, aby klepnutí kamkoliv nevypadalo jako stisk karty.
+                        Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onNext,
+                        )
+                    } else {
+                        Modifier
+                    },
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // Pořadí a skóre jako ListHeader, aby dostalo horní odsazení
@@ -131,7 +151,12 @@ fun WearQuestionScreen(
                     label = ANSWER_LABELS.getOrElse(index) { "?" },
                     answer = item.answers[index],
                     state = answerState(session, phase, item.correctIndex, index),
-                    onClick = { onSelect(index) },
+                    // V opravné fázi je i karta jen dalším místem, kde jde pokračovat.
+                    onClick = if (phase == WearUiState.Phase.Correction) {
+                        onNext
+                    } else {
+                        { onSelect(index) }
+                    },
                     // SurfaceTransformation je extension na scope položky seznamu,
                     // musí se tedy vytvářet až tady, ne mimo TransformingLazyColumn.
                     transformation = SurfaceTransformation(transformationSpec),
@@ -157,7 +182,9 @@ private fun answerState(
     index: Int,
 ): AnswerState = when (phase) {
     WearUiState.Phase.Asking -> AnswerState.Idle
-    // Během bliknutí svítí jen chybná volba, správná se ukáže až v opravě.
+    WearUiState.Phase.CorrectFlash ->
+        if (index == session.selectedIndex) AnswerState.Correct else AnswerState.Idle
+    // Během červeného bliknutí svítí jen chybná volba, správná se ukáže až v opravě.
     WearUiState.Phase.WrongFlash ->
         if (index == session.selectedIndex) AnswerState.Wrong else AnswerState.Idle
     WearUiState.Phase.Correction ->
@@ -241,8 +268,7 @@ private fun AnswerCard(
     }
 
     Card(
-        // Klepat jde jen ve fázi dotazu; potom karta jen ukazuje výsledek.
-        onClick = { if (state == AnswerState.Idle) onClick() },
+        onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = container),
         transformation = transformation,
         modifier = modifier,

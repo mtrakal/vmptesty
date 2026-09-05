@@ -54,10 +54,10 @@ sealed interface WearUiState {
 
     /**
      * Fáze otázky. Na hodinkách jde o rychlost drilu, takže se liší od telefonu:
-     * správná odpověď rovnou přeskočí dál, u chybné se krátce zablikne červeně
-     * a pak zůstane na obrazovce jen ta správná.
+     * správná odpověď krátce zezelená a sama přeskočí dál, u chybné se krátce
+     * zablikne červeně a pak zůstane na obrazovce jen ta správná.
      */
-    enum class Phase { Asking, WrongFlash, Correction }
+    enum class Phase { Asking, CorrectFlash, WrongFlash, Correction }
 
     data class Running(val session: QuizSession, val phase: Phase = Phase.Asking) : WearUiState
 
@@ -72,7 +72,8 @@ sealed interface WearUiState {
  * projedou celou vybranou sadu ([QuizLength.ALL]).
  */
 class WearQuizViewModel(
-    private val repository: QuestionRepository = QuestionRepository(),
+    /** Načtení otázek jako funkce, aby šel stavový automat otestovat bez resources. */
+    private val loadQuestions: suspend () -> List<Question> = QuestionRepository()::load,
 ) : ViewModel() {
 
     private var questions: List<Question> = emptyList()
@@ -87,7 +88,7 @@ class WearQuizViewModel(
     fun load() {
         uiState = WearUiState.Loading
         viewModelScope.launch {
-            uiState = runCatching { repository.load() }.fold(
+            uiState = runCatching { loadQuestions() }.fold(
                 onSuccess = { loaded ->
                     questions = loaded
                     pickingState()
@@ -107,28 +108,33 @@ class WearQuizViewModel(
     /**
      * Zaznamená odpověď.
      *
-     * Správná odpověď posune rovnou na další otázku — potvrzením je naskočené
-     * počítadlo, žádné další klepnutí není potřeba. Chybná odpověď se na
-     * [WRONG_FLASH_MS] zvýrazní červeně a pak se ukáže jen správná odpověď
-     * s tlačítkem dál.
+     * Správná odpověď na [FLASH_MS] zezelená a pak sama přeskočí na další
+     * otázku — bez potvrzování, ale s viditelnou reakcí na klepnutí. Chybná
+     * odpověď se na stejnou dobu zvýrazní červeně a pak zůstane na obrazovce
+     * jen ta správná s tlačítkem dál.
      */
     fun select(answerIndex: Int) {
         val running = uiState as? WearUiState.Running ?: return
         if (running.session.isAnswered) return
 
         val answered = running.session.select(answerIndex)
-        if (answered.isSelectionCorrect) {
-            uiState = WearUiState.Running(answered)
-            next()
-            return
-        }
+        val correct = answered.isSelectionCorrect
 
-        uiState = WearUiState.Running(answered, WearUiState.Phase.WrongFlash)
+        uiState = WearUiState.Running(
+            answered,
+            if (correct) WearUiState.Phase.CorrectFlash else WearUiState.Phase.WrongFlash,
+        )
+
         viewModelScope.launch {
-            delay(WRONG_FLASH_MS)
+            delay(FLASH_MS)
             val current = uiState
             // Mezitim uz mohl uzivatel klepnout na "dalsi"; prepisovat by bylo spatne.
-            if (current is WearUiState.Running && current.session.index == answered.index) {
+            if (current !is WearUiState.Running || current.session.index != answered.index) {
+                return@launch
+            }
+            if (correct) {
+                next()
+            } else {
                 uiState = WearUiState.Running(current.session, WearUiState.Phase.Correction)
             }
         }
@@ -149,8 +155,11 @@ class WearQuizViewModel(
     }
 
     private companion object {
-        /** Jak dlouho blikne chybně zvolená odpověď, než se ukáže ta správná. */
-        const val WRONG_FLASH_MS = 100L
+        /**
+         * Jak dlouho svítí zvolená odpověď, než se pokračuje. Bez toho by
+         * přechod na další otázku vypadal, jako by klepnutí nezabralo.
+         */
+        const val FLASH_MS = 100L
     }
 
     private fun pickingState() = WearUiState.Picking(

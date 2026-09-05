@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -18,12 +17,6 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 
-/** Zelená pro "správně" — Wear Material 3 nemá pro úspěch vlastní barvu. */
-internal val CorrectColor = Color(0xFF7BD88F)
-
-/** Podklad karty se správnou odpovědí. */
-internal val CorrectContainerColor = Color(0xFF17371F)
-
 /**
  * Kořen hodinkové aplikace.
  *
@@ -32,7 +25,7 @@ internal val CorrectContainerColor = Color(0xFF17371F)
  */
 @Composable
 fun WearApp(viewModel: WearQuizViewModel = viewModel { WearQuizViewModel() }) {
-    MaterialTheme {
+    VmpWearTheme {
         AppScaffold {
             when (val state = viewModel.uiState) {
                 WearUiState.Loading -> MessageScreen { CircularProgressIndicator() }
