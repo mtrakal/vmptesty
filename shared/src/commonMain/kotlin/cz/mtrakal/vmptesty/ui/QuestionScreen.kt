@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,45 +54,57 @@ fun QuestionScreen(
     // Nová otázka začíná odshora, jinak by zůstal scroll z předchozí.
     LaunchedEffect(session.index) { scrollState.scrollTo(0) }
 
-    Column(modifier = modifier.fillMaxSize()) {
-        QuizHeader(session)
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        // Obrázek smí zabrat nejvýš třetinu výšky, aby se pod něj vešlo zadání
+        // i odpovědi bez scrollování.
+        val imageMaxHeight = (maxHeight.value * IMAGE_HEIGHT_FRACTION).toInt()
+        // Obrázkové odpovědi jsou tři pod sebou, dostanou proto třetinu z toho.
+        val answerImageMaxHeight = imageMaxHeight / 3
 
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Spacer(Modifier.height(4.dp))
+        Column(modifier = Modifier.fillMaxSize()) {
+            QuizHeader(session)
 
-            Text(
-                text = item.question.text,
-                style = MaterialTheme.typography.titleMedium,
-            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Spacer(Modifier.height(4.dp))
 
-            item.question.image?.let { QuestionImage(name = it) }
+                Text(
+                    text = item.question.text,
+                    style = MaterialTheme.typography.titleMedium,
+                )
 
-            // Klíč na index otázky: bez něj by animateColorAsState dofadeovávalo
-            // zvýraznění z předchozí otázky přes novou, takže by chvíli svítila
-            // "správná" odpověď, na kterou se nikdo neptal.
-            key(session.index) {
-                item.answers.forEachIndexed { index, answer ->
-                    AnswerCard(
-                        label = ANSWER_LABELS.getOrElse(index) { "?" },
-                        answer = answer,
-                        state = answerState(session, item, index),
-                        onClick = { onSelect(index) },
-                    )
+                item.question.image?.let { QuestionImage(name = it, maxHeight = imageMaxHeight) }
+
+                // Klíč na index otázky: bez něj by animateColorAsState dofadeovávalo
+                // zvýraznění z předchozí otázky přes novou, takže by chvíli svítila
+                // "správná" odpověď, na kterou se nikdo neptal.
+                key(session.index) {
+                    item.answers.forEachIndexed { index, answer ->
+                        AnswerCard(
+                            label = ANSWER_LABELS.getOrElse(index) { "?" },
+                            answer = answer,
+                            state = answerState(session, item, index),
+                            onClick = { onSelect(index) },
+                            imageMaxHeight = answerImageMaxHeight,
+                        )
+                    }
                 }
+
+                Spacer(Modifier.height(8.dp))
             }
 
-            Spacer(Modifier.height(8.dp))
+            AnswerFooter(session = session, onNext = onNext)
         }
-
-        AnswerFooter(session = session, onNext = onNext)
     }
 }
+
+/** Obrázek u otázky zabere nejvýš třetinu výšky obrazovky. */
+private const val IMAGE_HEIGHT_FRACTION = 1f / 3f
 
 /** Jak se má odpověď vykreslit po odpovězení. */
 private enum class AnswerState { Idle, Correct, Wrong, Muted }
@@ -160,6 +173,7 @@ private fun AnswerCard(
     answer: Answer,
     state: AnswerState,
     onClick: () -> Unit,
+    imageMaxHeight: Int,
 ) {
     val container by animateColorAsState(
         when (state) {
@@ -197,7 +211,9 @@ private fun AnswerCard(
                     Text(text = answer.text, style = MaterialTheme.typography.bodyLarge)
                 }
                 // Odpověď může být jen obrázková, karta pak stojí na obrázku.
-                answer.image?.let { QuestionImage(name = it, maxHeight = 160) }
+                answer.image?.let {
+                    QuestionImage(name = it, maxHeight = imageMaxHeight)
+                }
             }
         }
     }

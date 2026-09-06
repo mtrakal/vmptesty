@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,6 +44,7 @@ import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
 import cz.mtrakal.vmptesty.data.Answer
 import cz.mtrakal.vmptesty.quiz.QuizSession
+import cz.mtrakal.vmptesty.ui.fittedHeight
 import cz.mtrakal.vmptesty.ui.rememberQuestionImage
 
 private val ANSWER_LABELS = listOf("a", "b", "c")
@@ -142,7 +145,7 @@ fun WearQuestionScreen(
             }
 
             item.question.image?.let { image ->
-                item { QuestionPicture(name = image, height = QUESTION_IMAGE_HEIGHT) }
+                item { QuestionPicture(name = image, maxHeight = QUESTION_IMAGE_HEIGHT) }
             }
 
             items(shownAnswers.size) { position ->
@@ -228,20 +231,35 @@ private fun ScoreDot(count: Int, color: Color) {
     }
 }
 
+/**
+ * Obrázek k otázce. Zdrojové obrázky jsou malé (medián 150×151 px), takže se
+ * musí zvětšit — výška se počítá z poměru stran, aby dostal celou šířku a
+ * nezůstal v původní velikosti uprostřed rámečku.
+ */
 @Composable
-private fun QuestionPicture(name: String, height: Int, modifier: Modifier = Modifier) {
-    val bitmap = rememberQuestionImage(name)
+private fun QuestionPicture(name: String, maxHeight: Int, modifier: Modifier = Modifier) {
+    val bitmap = rememberQuestionImage(name) ?: return
 
     Box(
-        modifier = modifier.fillMaxWidth().height(height.dp).clip(RoundedCornerShape(12.dp)),
+        modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        bitmap?.let {
+        BoxWithConstraints {
             Image(
-                bitmap = it,
+                bitmap = bitmap,
                 contentDescription = "Obrázek k otázce",
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(
+                        fittedHeight(
+                            imageWidth = bitmap.width,
+                            imageHeight = bitmap.height,
+                            availableWidth = maxWidth.value,
+                            maxHeight = maxHeight,
+                        ).dp,
+                    ),
                 contentScale = ContentScale.Fit,
+                filterQuality = FilterQuality.High,
             )
         }
     }
@@ -288,7 +306,7 @@ private fun AnswerCard(
                 answer.image?.let { image ->
                     QuestionPicture(
                         name = image,
-                        height = ANSWER_IMAGE_HEIGHT,
+                        maxHeight = ANSWER_IMAGE_HEIGHT,
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }
